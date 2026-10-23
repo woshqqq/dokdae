@@ -1,5 +1,6 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { reportAuthError } from "@/lib/auth/auth-errors";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { getDataSource } from "@/lib/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -26,6 +27,9 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
       : { error: new Error("missing code") };
 
-  if (error) return fail;
+  if (error) {
+    reportAuthError("callback", error, { flow: code ? "pkce" : tokenHash ? "token_hash" : "missing" });
+    return fail;
+  }
   return NextResponse.redirect(new URL(next, url.origin));
 }
