@@ -7,7 +7,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // Realtime 이벤트 내용은 쓰지 않고 "서버 데이터를 다시 불러오라"는 신호로만 쓴다.
 // 화면에 보이는 잔액·권한은 언제나 서버 컴포넌트가 DB에서 다시 읽은 값이다.
-const REALTIME_TABLES = ["pair_sessions", "wallets", "question_unlocks", "token_transactions"] as const;
+// wallets는 구독하지 않는다(DELETE 이벤트로 참여자 ID가 노출됨). 잔액 변경은 token_transactions 이벤트로 감지한다.
+const REALTIME_TABLES = ["pair_sessions", "question_unlocks", "token_transactions"] as const;
 
 export function LiveRefreshClient({ mode, intervalMs = 3000 }: { mode: DataSource; intervalMs?: number }) {
   const router = useRouter();

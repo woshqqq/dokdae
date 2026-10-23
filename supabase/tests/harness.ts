@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 //  - anon / authenticated / service_role 역할
 //  - auth 스키마, auth.users, auth.uid() (request.jwt.claim.sub 설정값을 읽음)
 //  - public 스키마 객체에 대한 기본 권한(anon·authenticated에 ALL) — 마이그레이션의 REVOKE가 실제로 효과가 있는지 확인하기 위함
+//  - supabase_realtime publication
 //
 // 한계: 단일 연결이므로 진짜 동시 트랜잭션(행 잠금 경쟁)은 재현할 수 없다.
 
@@ -34,6 +35,9 @@ grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
+-- Supabase 프로젝트에 기본으로 있는 Realtime publication (테이블 없이 생성됨)
+create publication supabase_realtime;
 `;
 
 const MIGRATIONS_DIR = fileURLToPath(new URL("../migrations/", import.meta.url));

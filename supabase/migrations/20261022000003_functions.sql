@@ -918,6 +918,13 @@ begin
     perform private.fail('NOT_FOUND');
   end if;
   select * into v_settings from public.room_settings s where s.room_id = p_room_id;
+  -- 참여자 목록이 비공개면 운영자이거나 이미 독대한 상대에게만 요청할 수 있다(room_members 정책과 같은 기준).
+  -- 다른 경로로 알아낸 ID로 요청하는 것을 막고, 존재 여부도 알려주지 않는다.
+  if not (v_settings.member_list_visible
+          or private.is_room_owner(p_room_id)
+          or private.shares_session(p_room_id, p_recipient_id)) then
+    perform private.fail('NOT_FOUND');
+  end if;
 
   perform private.lock_members(p_room_id, v_uid, p_recipient_id);
   perform private.expire_stale_sessions(p_room_id);

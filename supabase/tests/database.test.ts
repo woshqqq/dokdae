@@ -489,3 +489,89 @@ describe("모임 종료", () => {
     expect(await db.admin(`select 1 from rooms where id = $1`, [f.roomId])).toEqual([]);
   });
 });
+
+describe("Realtime publication", () => {
+  it("wallets는 publication에 없고(참여자 ID 노출 방지) 화면 갱신용 테이블만 들어 있다", async () => {
+    const rows = await db.admin<{ tablename: string }>(
+      `select tablename from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' order by tablename`,
+    );
+    expect(rows.map((r) => r.tablename)).toEqual(["pair_sessions", "question_unlocks", "token_transactions"]);
+  });
+});
+
+describe("참여자 목록 비공개", () => {
+  /** 씨(C)를 가입시키고 첫 질문에 답변하게 한 뒤 질문 ID를 돌려준다 */
+  async function joinOutsiderWithAnswer() {
+    await db.rpc(f.outsiderId, "join_room", [f.inviteCode, "씨"]);
+    const editor = await db.rpc<ProfileEditor>(f.outsiderId, "get_profile_editor", [f.roomId]);
+    await db.rpc(f.outsiderId, "update_profile", [
+      f.roomId,
+      "씨",
+      JSON.stringify(editor.questions.map((q, i) => ({ id: q.id, answer: i === 0 ? "C의 답변" : "", tokenCost: 1, isEnabled: true }))),
+    ]);
+    return editor.questions[0].id;
+  }
+  const hideMembers = () => db.admin(`update room_settings set member_list_visible = false where room_id = $1`, [f.roomId]);
+  const owners = async (uid: string) =>
+    (
+      await db.as<{ owner_id: string }>(
+        { role: "authenticated", uid },
+        `select distinct owner_id from public.member_questions where room_id = $1 order by owner_id`,
+        [f.roomId],
+      )
+    ).map((r) => r.owner_id);
+
+  it("공개 모임에서는 기존처럼 다른 참여자의 공개 질문이 보인다", async () => {
+    await joinOutsiderWithAnswer();
+    expect(await owners(f.outsiderId)).toContain(f.memberId);
+  });
+
+  it("비공개면 일반 참여자는 질문 메타데이터로 다른 참여자 ID를 알아낼 수 없다", async () => {
+    await joinOutsiderWithAnswer();
+    await hideMembers();
+    expect(await owners(f.outsiderId)).toEqual([f.outsiderId]);
+    expect((await errorOf(db.rpc(f.outsiderId, "get_member_profile", [f.roomId, f.memberId]))).message).toBe("NOT_FOUND");
+  });
+
+  it("비공개면 다른 경로로 알아낸 ID로도 독대를 요청할 수 없다", async () => {
+    await joinOutsiderWithAnswer();
+    await hideMembers();
+    await db.admin(`update room_settings set max_active_sessions_per_member = 3 where room_id = $1`, [f.roomId]);
+    expect((await errorOf(db.rpc(f.outsiderId, "request_session", [f.roomId, f.memberId]))).message).toBe("NOT_FOUND");
+    expect((await errorOf(db.rpc(f.outsiderId, "request_session", [f.roomId, f.ownerId]))).message).toBe("NOT_FOUND");
+    const sessions = await db.admin(`select 1 from pair_sessions where room_id = $1 and requester_id = $2`, [f.roomId, f.outsiderId]);
+    expect(sessions).toEqual([]);
+  });
+
+  it("비공개여도 운영자는 참여자의 질문을 보고 독대를 요청할 수 있다", async () => {
+    await joinOutsiderWithAnswer();
+    await hideMembers();
+    await db.admin(`update room_settings set max_active_sessions_per_member = 3 where room_id = $1`, [f.roomId]);
+    expect(await owners(f.ownerId)).toEqual([f.ownerId, f.memberId, f.outsiderId].sort());
+    const { sessionId } = await db.rpc<{ sessionId: string }>(f.ownerId, "request_session", [f.roomId, f.outsiderId]);
+    expect(sessionId).toBeTruthy();
+  });
+
+  it("비공개여도 이미 독대한 상대와는 질문 공개·수락·열기·재요청이 그대로 된다", async () => {
+    const outsiderQuestion = await joinOutsiderWithAnswer();
+    await db.admin(`update room_settings set max_active_sessions_per_member = 3 where room_id = $1`, [f.roomId]);
+    // 목록이 공개일 때 C가 B에게 요청해 둔 상태에서 비공개로 전환
+    const { sessionId } = await db.rpc<{ sessionId: string }>(f.outsiderId, "request_session", [f.roomId, f.memberId]);
+    await hideMembers();
+
+    expect(await owners(f.memberId)).toEqual([f.memberId, f.outsiderId].sort());
+    expect(await owners(f.outsiderId)).toEqual([f.memberId, f.outsiderId].sort());
+    await db.rpc(f.memberId, "respond_to_session", [sessionId, true]);
+    const view = await db.rpc<SessionView>(f.memberId, "get_session_view", [sessionId]);
+    expect(view.partner.nickname).toBe("씨");
+    expect(view.partnerQuestions.map((q) => q.meta.id)).toEqual([outsiderQuestion]);
+    expect((await db.rpc<{ alreadyUnlocked: boolean }>(f.memberId, "unlock_question", [sessionId, outsiderQuestion, 1])).alreadyUnlocked).toBe(false);
+
+    // 종료 후(보관 기간 중) 같은 상대에게 다시 요청할 수 있다
+    await db.admin(`update room_settings set session_retention_days = 3 where room_id = $1`, [f.roomId]);
+    await db.rpc(f.memberId, "vote_end_session", [sessionId]);
+    await db.rpc(f.outsiderId, "vote_end_session", [sessionId]);
+    const again = await db.rpc<{ sessionId: string }>(f.outsiderId, "request_session", [f.roomId, f.memberId]);
+    expect(again.sessionId).toBeTruthy();
+  });
+});

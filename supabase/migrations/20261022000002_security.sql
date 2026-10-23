@@ -191,12 +191,22 @@ create policy question_templates_select_member on public.question_templates
   for select to authenticated
   using (private.is_room_member(room_id));
 
--- 본인 질문 전체 + 같은 모임 참여자의 공개 질문 메타데이터
+-- 본인 질문 전체 + 같은 모임 참여자의 공개 질문 메타데이터.
+-- 참여자 목록이 비공개면 owner_id로 참여자를 알아낼 수 없도록, room_members 정책과 같은 조건
+-- (운영자 또는 독대 상대)에서만 다른 사람의 질문을 보여준다.
 create policy member_questions_select on public.member_questions
   for select to authenticated
   using (
     owner_id = (select auth.uid())
-    or (private.is_room_member(room_id) and private.is_public_question(id))
+    or (
+      private.is_room_member(room_id)
+      and private.is_public_question(id)
+      and (
+        private.member_list_visible(room_id)
+        or private.is_room_owner(room_id)
+        or private.shares_session(room_id, owner_id)
+      )
+    )
   );
 
 -- 답변 원문: 소유자 또는 활성 독대에서 연 상대만
