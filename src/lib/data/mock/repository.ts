@@ -1,4 +1,5 @@
 import "server-only";
+import { io } from "next/cache";
 import { DataError } from "../errors";
 import type { DokdaeRepository } from "../repository";
 import * as engine from "./engine";
@@ -14,7 +15,13 @@ export function createMockRepository(actorId: string | null): DokdaeRepository {
     return { db, actorId, now };
   };
   // 엔진은 동기 함수이므로, 실제 비동기 데이터 소스와 같은 모양이 되도록 Promise로 감싼다.
-  const run = async <T>(fn: (c: engine.EngineCtx) => T): Promise<T> => structuredClone(fn(ctx()));
+  // 동기 엔진에는 await 지점이 없어 사전 렌더링 중에 현재 시각(new Date())을 읽게 된다.
+  // io()로 사전 렌더링을 여기서 멈춰, 시각 읽기와 만료 정리가 요청 시점에만 일어나게 한다.
+  // (요청 처리·Server Action 안에서는 즉시 resolve된다.)
+  const run = async <T>(fn: (c: engine.EngineCtx) => T): Promise<T> => {
+    await io();
+    return structuredClone(fn(ctx()));
+  };
 
   return {
     listMyRooms: () => run((c) => engine.listMyRooms(c)),
