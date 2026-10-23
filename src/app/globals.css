@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #faf7f2;
+  --color-surface: #ffffff;
+  --color-sunken: #f3eee6;
+  --color-ink: #1f1b16;
+  --color-muted: #675e54;
+  --color-line: #e6ded2;
+  --color-brand: #b9410f;
+  --color-brand-strong: #9a3409;
+  --color-brand-soft: #fdeee3;
+  --color-token: #a35a00;
+  --color-token-soft: #fff4dc;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-success: #17703a;
+  --color-success-soft: #e7f5ec;
+  --color-warn-soft: #fff6d6;
+
+  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+dialog::backdrop {
+  background: rgb(31 27 22 / 0.45);
+}

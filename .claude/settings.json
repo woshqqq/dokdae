@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm install server-only 2>&1 | Select-String -NotMatch \"install-scripts|funding|npm fund\")",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm run typecheck 2>&1 | Select-Object -Last 40)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm test 2>&1 | Select-Object -Last 40)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm run typecheck 2>&1 | Select-Object -Last 40; npm run lint 2>&1 | Select-Object -Last 40)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm run typecheck 2>&1 | Select-Object -Last 30; npm run lint 2>&1 | Select-Object -Last 30; npm test 2>&1 | Select-Object -Last 8)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm run build 2>&1 | Select-Object -Last 60)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npx next start -p 3000)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); node \"C:\\\\TEMPFO~1\\\\claude\\\\c--git------dokdae\\\\7b4e52bd-901a-47ba-9135-9011929d95e6\\\\scratchpad\\\\smoke.mjs\")",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); npm install @supabase/supabase-js @supabase/ssr 2>&1 | Select-String -NotMatch \"funding|npm fund\"; npm install -D @electric-sql/pglite supabase 2>&1 | Select-String -NotMatch \"funding|npm fund\"; npm ls @supabase/supabase-js @supabase/ssr @electric-sql/pglite supabase --depth=0)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx supabase --version; if \\($?\\) { npx supabase init --force:$false 2>&1 }; Get-ChildItem supabase -Force -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx supabase init 2>&1 | Select-Object -Last 5; Get-ChildItem supabase -Force -Recurse | Select-Object FullName)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx vitest run supabase 2>&1 | Select-Object -Last 80)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx vitest run supabase 2>&1 | Select-Object -Last 30)",
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npm test 2>&1 | Select-Object -Last 25; npm run typecheck 2>&1 | Select-Object -Last 30; npm run lint 2>&1 | Select-Object -Last 30)"
+    ]
+  }
+}
