@@ -32,6 +32,20 @@ npm run dev                  # http://localhost:3000
 - 비워 두면 개발 서버는 mock, 프로덕션 빌드는 supabase입니다(설정 누락으로 실서비스에 데모 로그인이 열리지 않도록).
 - supabase 모드에서는 데모 로그인 액션이 거부되고, mock 쿠키를 넣어도 로그인되지 않습니다.
 
+### 비회원 테스트 모드 (`/test-login`)
+
+회원가입·이메일 인증 없이 공통 비밀번호 하나로 데모 데이터를 써 볼 수 있는 모드입니다. 기존 회원가입·로그인은 그대로 함께 동작합니다.
+
+- **켜기/끄기**: `DOKDAE_TEST_MODE=true`와 `DOKDAE_TEST_PASSWORD`(8자 이상)를 서버 환경변수로 설정하면 켜집니다. `DOKDAE_TEST_MODE`를 `false`로 바꾸거나 지우면 꺼집니다. 꺼지면 `/test-login`은 404이고 남아 있던 테스트 쿠키는 무시·삭제됩니다.
+- **세션**: 비밀번호는 서버에서만 확인합니다(상수 시간 비교, 같은 IP에서 10분에 10번까지 실패 허용). 통과하면 HMAC 서명된 httpOnly·Secure·SameSite=Lax 쿠키가 8시간 동안 유지됩니다. 서명 키는 비밀번호에서 만들기 때문에 비밀번호를 바꾸면 모든 테스트 세션이 즉시 만료됩니다. 화면 상단 배너의 "테스트 종료"로 직접 끝낼 수도 있습니다.
+- **데이터 격리**: 테스트 세션 요청은 Supabase 클라이언트를 만들지 않습니다(운영 DB를 읽지도 쓰지도 않음). 로그인할 때마다 새 "테스트 공간"(시드된 mock DB)이 생겨 테스트하는 사람끼리 데이터가 섞이지 않습니다. 두 사람이 1:1 흐름을 함께 시험하려면 배너의 공간 코드를 다른 브라우저의 `/test-login`에 입력해 같은 공간에 들어갑니다.
+- **데이터 유지 한계(중요)**: 테스트 공간은 서버 프로세스 메모리에만 있습니다. Vercel 같은 서버리스 환경에서는
+  - 함수 인스턴스가 재시작·교체·축소되면 데이터가 사라지고,
+  - 요청이 다른 인스턴스로 가면 그 인스턴스에서 공간이 시드 상태로 새로 만들어집니다(배너에 안내 표시). 이때 이전 URL의 모임·독대가 "찾을 수 없음"으로 보일 수 있습니다.
+  - 실시간 반영은 Supabase Realtime이 아니라 주기적 재조회입니다.
+
+  따라서 화면·흐름 확인용으로만 쓰고, 데이터가 유지되어야 하는 테스트는 별도 Supabase 프로젝트(스테이징)를 쓰세요.
+
 ## Supabase 설정과 마이그레이션 적용 (원격 적용 전 체크리스트)
 
 1. **API 키**: 대시보드 > Project Settings > API Keys에서 URL과 publishable key를 `.env.local`에 넣고 `DOKDAE_DATA_SOURCE=supabase`를 추가합니다.
@@ -55,6 +69,7 @@ npm run dev                  # http://localhost:3000
 1. GitHub 저장소를 Vercel에 연결합니다.
 2. Environment Variables에 `DOKDAE_DATA_SOURCE=supabase`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL`(배포 주소), 필요하면 `SUPABASE_SECRET_KEY`, `CRON_SECRET`을 등록합니다.
 3. Supabase Redirect URLs에 배포 도메인의 `/auth/callback`을 추가합니다.
+4. (선택) 비회원 테스트 모드: `DOKDAE_TEST_MODE=true`, `DOKDAE_TEST_PASSWORD`를 **Sensitive**로 등록하고 다시 배포합니다. 끌 때는 `DOKDAE_TEST_MODE`를 `false`로 바꾸고 다시 배포합니다.
 
 ## 구조
 

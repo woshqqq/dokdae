@@ -9,10 +9,10 @@ import { LinkButton } from "@/components/ui/button";
 import { Card, EmptyState, Section } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Tokens } from "@/components/ui/token";
-import { getCurrentUser } from "@/lib/auth/session";
-import { getDataSource } from "@/lib/config";
+import { getAuthContext, getCurrentUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data";
 import { MOCK_DEMO_INVITE_CODE, MOCK_USERS } from "@/lib/data/mock/store";
+import { isTestModeEnabled } from "@/lib/test-mode/config";
 
 export default function HomePage({ searchParams }: PageProps<"/">) {
   return (
@@ -28,6 +28,7 @@ async function Home({ searchParams }: Pick<PageProps<"/">, "searchParams">) {
   const user = await getCurrentUser();
 
   if (!user) {
+    const { kind } = await getAuthContext();
     return (
       <div className="space-y-8">
         <Intro />
@@ -35,7 +36,16 @@ async function Home({ searchParams }: Pick<PageProps<"/">, "searchParams">) {
         {params.error === "auth_callback" ? (
           <Notice tone="error">인증 링크가 만료되었거나 올바르지 않습니다. 다시 로그인해 주세요.</Notice>
         ) : null}
-        {getDataSource() === "mock" ? <MockSignIn next={next} /> : <AuthForm next={next} />}
+        {kind === "supabase" ? <AuthForm next={next} /> : <MockSignIn next={next} testMode={kind === "test"} />}
+        {kind === "supabase" && isTestModeEnabled() ? (
+          <p className="text-center text-sm text-muted">
+            회원가입 없이 둘러보려면{" "}
+            <Link href="/test-login" className="font-semibold text-brand underline-offset-2 hover:underline">
+              비회원 테스트 모드
+            </Link>
+            로 들어가세요.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -116,12 +126,15 @@ function Intro() {
   );
 }
 
-function MockSignIn({ next }: { next: string }) {
+function MockSignIn({ next, testMode }: { next: string; testMode: boolean }) {
   return (
     <Section title="데모 사용자로 시작하기">
       <Notice tone="warn">
-        실제 로그인이 아닌 <strong>임시 사용자 전환</strong>입니다. 두 브라우저(또는 시크릿 창)에서 서로 다른 사용자를 골라
-        독대 흐름을 확인할 수 있어요. 데모 모임 코드: <strong className="font-mono">{MOCK_DEMO_INVITE_CODE}</strong>
+        실제 로그인이 아닌 <strong>임시 사용자 전환</strong>입니다.{" "}
+        {testMode
+          ? "다른 브라우저(또는 시크릿 창)에서 상단의 공간 코드로 같은 테스트 공간에 들어가 서로 다른 사용자를 고르면 독대 흐름을 확인할 수 있어요."
+          : "두 브라우저(또는 시크릿 창)에서 서로 다른 사용자를 골라 독대 흐름을 확인할 수 있어요."}{" "}
+        데모 모임 코드: <strong className="font-mono">{MOCK_DEMO_INVITE_CODE}</strong>
       </Notice>
       <div className="grid grid-cols-2 gap-2">
         {MOCK_USERS.map((u) => (

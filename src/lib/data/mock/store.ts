@@ -14,7 +14,8 @@ export const MOCK_USERS: MockUser[] = [
 
 export const MOCK_DEMO_INVITE_CODE = "DEMO-2026";
 
-function seed(): MockDb {
+/** 데모 사용자·모임·답변이 들어 있는 새 DB. 테스트 공간도 이 시드로 시작한다. */
+export function seed(): MockDb {
   const db = emptyDb();
   db.users = [...MOCK_USERS];
   const now = new Date();

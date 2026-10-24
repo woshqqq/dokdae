@@ -21,7 +21,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
-        <MockBanner />
+        <Suspense fallback={null}>
+          <MockBanner />
+        </Suspense>
         <div className="sticky top-0 z-20 border-b border-line/70 bg-bg/90 backdrop-blur">
           <div className="mx-auto flex h-14 w-full max-w-lg items-center justify-between px-4">
             <Link href="/" className="text-lg font-extrabold tracking-tight">

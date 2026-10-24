@@ -2,14 +2,18 @@ import "server-only";
 import { io } from "next/cache";
 import { DataError } from "../errors";
 import type { DokdaeRepository } from "../repository";
+import type { MockDb } from "./db";
 import * as engine from "./engine";
 import { getMockDb } from "./store";
 
-/** 임시 데이터 구현. 로그인한 사용자(actorId)에 묶여 생성된다. */
-export function createMockRepository(actorId: string | null): DokdaeRepository {
+/**
+ * 임시 데이터 구현. 로그인한 사용자(actorId)에 묶여 생성된다.
+ * getDb로 사용할 DB를 고른다(기본: 개발용 공용 DB, 테스트 모드: 세션별 테스트 공간).
+ */
+export function createMockRepository(actorId: string | null, getDb: () => MockDb = getMockDb): DokdaeRepository {
   const ctx = (): engine.EngineCtx => {
     if (!actorId) throw new DataError("UNAUTHENTICATED");
-    const db = getMockDb();
+    const db = getDb();
     const now = new Date();
     engine.runMaintenance({ db, now });
     return { db, actorId, now };

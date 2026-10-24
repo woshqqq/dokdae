@@ -6,27 +6,40 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { reportAuthError, resolveSiteOrigin } from "@/lib/auth/auth-errors";
 import { safeNextPath } from "@/lib/auth/safe-next";
-import { MOCK_SESSION_COOKIE } from "@/lib/auth/session";
+import { getAuthContext, MOCK_SESSION_COOKIE } from "@/lib/auth/session";
 import { getDataSource } from "@/lib/config";
 import { MOCK_USERS } from "@/lib/data/mock/store";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { writeTestSession } from "@/lib/test-mode/session";
 
-/** 임시 모드 전용: 데모 사용자로 전환. 실제 인증이 아니므로 supabase 모드에서는 거부한다. */
+/**
+ * 데모 사용자 고르기. 개발용 mock 모드에서는 사용자 쿠키를, 비회원 테스트 세션에서는 세션 안의 사용자를 바꾼다.
+ * 실제 인증이 아니므로 그 밖의 경우(supabase 모드)에는 거부한다.
+ */
 export async function signInAsMockUser(formData: FormData) {
-  if (getDataSource() !== "mock") throw new Error("임시 로그인은 mock 모드에서만 사용할 수 있습니다.");
+  const context = await getAuthContext();
+  if (context.kind === "supabase") throw new Error("임시 로그인은 mock 모드나 테스트 세션에서만 사용할 수 있습니다.");
   const userId = String(formData.get("userId") ?? "");
   if (!MOCK_USERS.some((u) => u.id === userId)) redirect("/?error=unknown_user");
-  (await cookies()).set(MOCK_SESSION_COOKIE, userId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-  });
+  if (context.kind === "test") {
+    await writeTestSession({ ...context.session, uid: userId });
+  } else {
+    (await cookies()).set(MOCK_SESSION_COOKIE, userId, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+  }
   redirect(safeNextPath(String(formData.get("next") ?? "")));
 }
 
 export async function signOut() {
-  if (getDataSource() === "mock") {
+  const context = await getAuthContext();
+  if (context.kind === "test") {
+    // 테스트 세션은 유지하고 데모 사용자 선택만 해제한다(사용자 전환). 세션 종료는 endTestSession.
+    await writeTestSession({ ...context.session, uid: null });
+  } else if (context.kind === "mock") {
     (await cookies()).delete(MOCK_SESSION_COOKIE);
   } else {
     await (await createSupabaseServerClient()).auth.signOut();
