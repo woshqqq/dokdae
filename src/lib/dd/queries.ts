@@ -10,6 +10,9 @@ export interface Overview {
   me: { id: string; nickname: string; bio: string; has_photo: boolean; is_creator: boolean; ready: boolean };
   question_count: number;
   min_questions: number;
+  /** 내 토큰 잔액 */
+  balance: number;
+  items_count: number;
   members: {
     id: string;
     nickname: string;
@@ -69,3 +72,55 @@ export function defaultNumbers<T extends { id: string; kind: string }>(items: T[
   for (const item of items) if (item.kind === "default") numbers.set(item.id, String(++n).padStart(2, "0"));
   return numbers;
 }
+
+export type ItemKind = "tell" | "ask";
+
+export interface OwnerOpen {
+  unlock_id: string;
+  viewer_nickname: string;
+  opened_at: string;
+  tokens_paid: number;
+  reward_confirmed: boolean;
+  /** 확정된 보상만 보인다(열람자의 미확정 선택값은 숨김) */
+  reward_amount: number | null;
+}
+
+export interface MyItems {
+  max_items: number;
+  cost_min: number;
+  cost_max: number;
+  reward_max: number;
+  items: { id: string; kind: ItemKind; body: string; cost: number; opens: OwnerOpen[] }[];
+  removed_opens: OwnerOpen[];
+}
+
+export interface PeerItems {
+  balance: number;
+  reward_max: number;
+  /** active 독대에서만 채워진다. 열람 전 정보는 순번과 비용뿐이다. */
+  items: { id: string; ordinal: number; cost: number; unlocked: boolean }[];
+  opened: {
+    unlock_id: string;
+    /** 독대가 active 일 때만 값이 있다(열람 당시 내용) */
+    kind: ItemKind | null;
+    body: string | null;
+    item_deleted: boolean;
+    tokens_paid: number;
+    opened_at: string;
+    reward_selected: number | null;
+    reward_amount: number | null;
+    reward_confirmed: boolean;
+  }[];
+}
+
+export interface Transaction {
+  type: "initial_grant" | "unlock_payment" | "reward";
+  amount: number;
+  created_at: string;
+  direction: "in" | "out";
+  counterpart: string | null;
+}
+
+export const getMyItems = (viewer: Viewer) => viewerRpc<MyItems>(viewer, "dd_api_my_items");
+export const getPeerItems = (viewer: Viewer, pairId: string) => viewerRpc<PeerItems>(viewer, "dd_api_peer_items", { p_pair: pairId });
+export const getMyTransactions = (viewer: Viewer) => viewerRpc<Transaction[]>(viewer, "dd_api_my_transactions");

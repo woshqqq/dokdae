@@ -73,7 +73,7 @@ describe("공개 API(anon, 토큰 기반)", () => {
     expect((await errorOf(api("dd_api_get_photo", r1.roomId, r2.token, r1.id))).message).toBe("UNAUTHENTICATED");
   });
 
-  it("제3자는 독대 답변을 읽을 수 없고, 당사자는 수락 뒤에만 읽으며, 종료 후엔 다시 막힌다", async () => {
+  it("제3자는 독대 정보를 읽을 수 없고, 당사자도 수락 뒤에 소개글만 읽으며, 종료 후엔 다시 막힌다", async () => {
     const a = await room("에이");
     const b = await joinApi(a.code, "비");
     const third = await joinApi(a.code, "씨");
@@ -89,8 +89,9 @@ describe("공개 API(anon, 토큰 기반)", () => {
     expect((await errorOf(api("dd_api_view_pair", a.roomId, third.token, pairId))).message).toBe("NOT_FOUND");
 
     await api("dd_api_respond_pair", a.roomId, b.token, pairId, true);
-    const after = await api<{ peer: { answers: { answer: string | null }[] } }>("dd_api_view_pair", a.roomId, a.token, pairId);
-    expect(after.peer.answers[0].answer).toBe("B 비밀");
+    const after = await api<{ peer: { answers: unknown } }>("dd_api_view_pair", a.roomId, a.token, pairId);
+    expect(after.peer.answers).toBeNull(); // 답변은 더 이상 이 경로로 열리지 않는다(항목은 열람 결제로만)
+    expect(JSON.stringify(after)).not.toContain("B 비밀");
     expect((await errorOf(api("dd_api_view_pair", a.roomId, third.token, pairId))).message).toBe("NOT_FOUND");
 
     await api("dd_api_consent", a.roomId, a.token, pairId);

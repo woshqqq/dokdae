@@ -49,32 +49,26 @@ async function Room({ params, searchParams }: Pick<PageProps<"/room/[roomId]">, 
         </Card>
       ) : null}
 
-      <Section title="내 준비 상태">
-        <Card className="space-y-3">
-          <div className="flex items-center gap-3">
-            <PersonAvatar roomId={roomId} id={o.me.id} nickname={o.me.nickname} hasPhoto={o.me.has_photo} />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">1. 프로필</p>
-              <p className="text-sm text-muted">{needsProfile ? "사진과 소개를 채워 보세요(선택)." : "작성했어요."}</p>
-            </div>
-            <LinkButton href={`/room/${roomId}/profile`} variant="secondary" size="sm">
-              수정
-            </LinkButton>
+      <Card className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-muted">내 토큰</p>
+          <p className="text-2xl font-extrabold tabular-nums">{o.balance}개</p>
+        </div>
+        <LinkButton href={`/room/${roomId}/items`} variant="secondary" size="sm">
+          내 항목 {o.items_count}/10
+        </LinkButton>
+      </Card>
+
+      <Section title="내 프로필">
+        <Card className="flex items-center gap-3">
+          <PersonAvatar roomId={roomId} id={o.me.id} nickname={o.me.nickname} hasPhoto={o.me.has_photo} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">{o.me.nickname}</p>
+            <p className="text-sm text-muted">{needsProfile ? "사진과 소개를 채워 보세요(선택)." : "작성했어요."}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex size-10 items-center justify-center rounded-full bg-sunken text-sm font-bold tabular-nums">
-              {o.question_count}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">2. 질문과 답변</p>
-              <p className="text-sm text-muted">
-                {o.me.ready ? "준비를 마쳤어요." : `질문 ${o.question_count}/${o.min_questions}개 구성`}
-              </p>
-            </div>
-            <LinkButton href={`/room/${roomId}/questions`} variant={o.me.ready ? "secondary" : "primary"} size="sm">
-              {o.me.ready ? "수정" : "작성하기"}
-            </LinkButton>
-          </div>
+          <LinkButton href={`/room/${roomId}/profile`} variant="secondary" size="sm">
+            수정
+          </LinkButton>
         </Card>
       </Section>
 
@@ -118,22 +112,18 @@ async function Room({ params, searchParams }: Pick<PageProps<"/room/[roomId]">, 
                 <PersonAvatar roomId={roomId} id={m.id} nickname={m.nickname} hasPhoto={m.has_photo} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{m.nickname}</p>
-                  <p className="text-xs text-muted">{m.ready ? "준비 완료" : "아직 준비 중"}</p>
                 </div>
                 {m.pair ? (
                   <LinkButton href={`/room/${roomId}/dokdae/${m.pair.id}`} variant="secondary" size="sm">
                     {statusLabel[m.pair.status]}
                   </LinkButton>
-                ) : o.me.ready && m.ready ? (
+                ) : (
                   <RequestPairButton roomId={roomId} peerId={m.id} nickname={m.nickname} />
-                ) : null}
+                )}
               </li>
             ))}
           </ul>
         )}
-        {!o.me.ready && o.members.length > 0 ? (
-          <Notice tone="info">내 질문 구성을 마치면 준비된 참가자에게 독대를 요청할 수 있어요.</Notice>
-        ) : null}
       </Section>
 
       {history.length > 0 ? (

@@ -2,13 +2,14 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ConsentButton, EndPairButton, RespondButtons } from "@/components/dd/pair-controls";
 import { NoAccess } from "@/components/dd/no-access";
+import { PairItems } from "@/components/dd/pair-items";
 import { PersonAvatar } from "@/components/dd/person-avatar";
 import { Poll } from "@/components/dd/poll";
 import { PageHeader, PageSkeleton } from "@/components/page";
-import { Card, Section } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { DdError } from "@/lib/dd/errors";
-import { defaultNumbers, getPairView, type PairView } from "@/lib/dd/queries";
+import { getPairView, getPeerItems, type PairView, type PeerItems } from "@/lib/dd/queries";
 import { getViewer } from "@/lib/dd/session";
 import { formatTime } from "@/lib/format";
 
@@ -26,15 +27,17 @@ async function Pair({ params }: Pick<PageProps<"/room/[roomId]/dokdae/[pairId]">
   if (!viewer) return <NoAccess />;
 
   let view: PairView;
+  let items: PeerItems | null = null;
   try {
     view = await getPairView(viewer, pairId);
+    // 항목은 active(열람·결제)와 closed(보상 확정)에서만 다룬다. 서버가 상태별로 내려줄 정보를 다시 제한한다.
+    if (view.pair.status === "active" || view.pair.status === "closed") items = await getPeerItems(viewer, pairId);
   } catch (error) {
     if (error instanceof DdError && error.code === "NOT_FOUND") notFound();
     throw error;
   }
   const { pair, peer } = view;
   const live = pair.status === "requested" || pair.status === "reviewing" || pair.status === "active";
-  const numbers = defaultNumbers(peer.answers ?? []);
 
   return (
     <div className="space-y-6">
@@ -67,7 +70,7 @@ async function Pair({ params }: Pick<PageProps<"/room/[roomId]/dokdae/[pairId]">
       {pair.status === "reviewing" ? (
         <div className="space-y-3">
           <Notice tone="warn" title="서로 확인하는 중이에요">
-            아래 내용을 보고 독대를 시작할지 정하세요. 양쪽이 모두 동의해야 시작되고, 그만두면 상대의 내용은 다시 가려집니다.
+            상대의 소개를 보고 독대를 시작할지 정하세요. 양쪽이 모두 동의해야 시작되고, 시작된 뒤에 항목을 열어 볼 수 있어요.
             {pair.peer_consent ? " 상대는 이미 동의했어요." : ""}
           </Notice>
           <ConsentButton roomId={roomId} pairId={pair.id} consented={pair.my_consent} />
@@ -79,40 +82,20 @@ async function Pair({ params }: Pick<PageProps<"/room/[roomId]/dokdae/[pairId]">
         <div className="space-y-3">
           <Notice tone="success" title="독대가 시작됐어요">
             {pair.started_at ? `${formatTime(pair.started_at)}에 양쪽이 동의해 시작했어요. ` : ""}
-            마주 보고 이야기를 나눠 보세요.
+            아래에서 토큰을 내고 상대의 항목을 열어 보세요.
           </Notice>
-          <EndPairButton roomId={roomId} pairId={pair.id} label="독대 종료" confirmText="독대를 종료할까요? 종료하면 상대의 소개와 답변이 다시 가려집니다." />
+          <EndPairButton roomId={roomId} pairId={pair.id} label="독대 종료" confirmText="독대를 종료할까요? 종료하면 열어 본 항목의 내용은 더 이상 보이지 않아요. (보상 지급 확정은 종료 후에도 할 수 있어요.)" />
         </div>
       ) : null}
 
       {pair.status === "closed" || pair.status === "declined" ? (
         <Notice tone="info" title={pair.status === "closed" ? "종료된 독대예요" : "진행되지 않은 독대예요"}>
           {pair.closed_at ? `${formatTime(pair.closed_at)}에 끝났어요. ` : ""}
-          상대의 소개와 답변은 더 이상 보이지 않습니다.
+          상대의 소개와 항목은 더 이상 보이지 않습니다.
         </Notice>
       ) : null}
 
-      {peer.answers ? (
-        <Section title={`${peer.nickname}님의 답변`}>
-          <ul className="space-y-3">
-            {peer.answers.map((a) => (
-              <li key={a.id}>
-                <Card className="space-y-2">
-                  <p className="text-xs font-bold text-brand">
-                    {a.kind === "default" ? `${numbers.get(a.id)} · ${a.title}` : "나의 질문"}
-                  </p>
-                  <p className="font-semibold leading-snug">{a.body}</p>
-                  {a.answer ? (
-                    <p className="whitespace-pre-wrap leading-relaxed">{a.answer}</p>
-                  ) : (
-                    <p className="text-sm text-muted">건너뛴 질문이에요.</p>
-                  )}
-                </Card>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
+      {items ? <PairItems roomId={roomId} pairId={pair.id} status={pair.status} data={items} /> : null}
 
       {live ? <Poll /> : null}
     </div>

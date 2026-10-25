@@ -25,3 +25,10 @@ export const defaultQuestionSchema = z.object({
   hint: z.string().trim().max(300, "설명은 300자 이하로 입력해 주세요."),
   position: z.number().int("순서는 정수여야 해요.").min(0).max(1000),
 });
+
+export const itemKindSchema = z.enum(["tell", "ask"], { message: "항목 유형을 선택해 주세요." });
+export const itemBodySchema = text("항목 내용", 1, 500);
+// 허용 범위(1~3, 보상 0~5)는 DB의 dd_settings 가 최종 판단한다. 여기서는 형식만 거른다.
+export const costSchema = z.number().int("비용은 정수여야 해요.").min(1).max(100);
+export const rewardAmountSchema = z.number().int("보상은 정수여야 해요.").min(0).max(100);
+export const itemInputSchema = z.object({ kind: itemKindSchema, body: itemBodySchema, cost: costSchema });

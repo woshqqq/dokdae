@@ -32,7 +32,7 @@ describe("권한 전체 점검", () => {
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'public' and left(p.proname, 7) = 'dd_api_'`,
     );
-    expect(rows.length).toBe(20);
+    expect(rows.length).toBe(29);
     // 토큰 검증 없이 동작하는 것은 의도된 2개뿐: 기본 질문 조회(공개 문구), 관리자 수정(증명 해시 + DB 잠금). 방 생성·입장은 토큰을 새로 등록한다.
     const noResolve = rows.filter((r) => !/dd_resolve|dd_hash_text\(p_token\)/.test(r.src)).map((r) => r.proname).sort();
     expect(noResolve).toEqual(["dd_api_admin_update_question", "dd_api_default_questions"]);
@@ -51,7 +51,7 @@ describe("권한 전체 점검", () => {
        where n.nspname = 'public' and c.relkind = 'r' and left(c.relname, 3) = 'dd_'`,
     );
     expect(rows.map((r) => r.relname).sort()).toEqual(
-      ["dd_admin_proof", "dd_answers", "dd_pairs", "dd_participants", "dd_photos", "dd_questions", "dd_rooms", "dd_settings"],
+      ["dd_admin_proof", "dd_answers", "dd_items", "dd_pairs", "dd_participants", "dd_photos", "dd_questions", "dd_rooms", "dd_settings", "dd_token_tx", "dd_unlocks", "dd_wallets"],
     );
     for (const r of rows) expect(r, r.relname).toMatchObject({ rls: true, anon: false, auth: false });
   });

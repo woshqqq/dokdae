@@ -138,27 +138,21 @@ describe("방 생성·입장·인증", () => {
 });
 
 describe("질문 구성", () => {
-  it("기본 질문 5개가 시드되어 있고 10개 미만이면 준비 완료할 수 없다", async () => {
+  it("기본 질문 5개가 시드되어 있고, 최소 개수 규칙은 제거되어 언제든 준비 완료할 수 있다", async () => {
     const r = await createRoom();
     const q = await call<{ total: number; min_questions: number; questions: { kind: string; title: string }[] }>("dd_my_questions", r.owner.id);
     expect(q.total).toBe(5);
-    expect(q.min_questions).toBe(10);
+    expect(q.min_questions).toBe(0); // 20261025000003 에서 10 → 0
     expect(q.questions.map((x) => x.title)).toEqual(["지금의 나", "알아줬으면 하는 나", "잘 드러나지 않는 나", "나를 둘러싼 환경", "이해받고 싶은 나"]);
-    expect((await errorOf(call("dd_mark_ready", r.owner.id))).message).toBe("MIN_QUESTIONS");
-    for (let i = 0; i < 4; i++) await call("dd_add_question", r.owner.id, `질문 ${i}`);
-    expect((await errorOf(call("dd_mark_ready", r.owner.id))).message).toBe("MIN_QUESTIONS");
-    await call("dd_add_question", r.owner.id, "다섯째");
     await call("dd_mark_ready", r.owner.id);
     expect((await call<{ ready: boolean }>("dd_my_questions", r.owner.id)).ready).toBe(true);
   });
 
-  it("준비를 마친 뒤에는 최소 개수 아래로 개인 질문을 지울 수 없다", async () => {
+  it("최소 개수 규칙이 없으므로 개인 질문은 언제든 지울 수 있다", async () => {
     const r = await createRoom();
     await makeReady(r.owner);
     const { questions } = await call<{ questions: { id: string; kind: string }[] }>("dd_my_questions", r.owner.id);
     const personal = questions.find((q) => q.kind === "personal")!;
-    expect((await errorOf(call("dd_delete_question", r.owner.id, personal.id))).message).toBe("MIN_QUESTIONS");
-    await call("dd_add_question", r.owner.id, "여섯째");
     await call("dd_delete_question", r.owner.id, personal.id);
   });
 
@@ -205,7 +199,7 @@ describe("질문 구성", () => {
 });
 
 describe("독대와 열람 권한", () => {
-  it("요청만 있거나 요청 전에는 상대의 소개·답변이 내려가지 않는다", async () => {
+  it("요청만 있으면 상대의 소개·답변이 내려가지 않는다", async () => {
     const t = await twoReady();
     const pairId = await call<string>("dd_request_pair", t.a.id, t.b.id);
     for (const viewer of [t.a, t.b]) {
@@ -216,14 +210,18 @@ describe("독대와 열람 권한", () => {
     }
   });
 
-  it("수락(reviewing) 후에는 서로의 답변이 보이고, 양쪽 동의 전에는 active 가 아니다", async () => {
+  it("수락(reviewing) 후에는 소개글만 열리고(답변 없음), 양쪽 동의 전에는 active 가 아니다", async () => {
     const t = await twoReady();
     const pairId = await call<string>("dd_request_pair", t.a.id, t.b.id);
     expect(await call("dd_respond_pair", t.b.id, pairId, true)).toBe("reviewing");
-    const aSees = await call<{ peer: { answers: { answer: string | null }[] } }>("dd_view_pair", t.a.id, pairId);
-    const bSees = await call<{ peer: { answers: { answer: string | null }[] } }>("dd_view_pair", t.b.id, pairId);
-    expect(aSees.peer.answers[0].answer).toBe("B의 비밀 답변");
-    expect(bSees.peer.answers[0].answer).toBe("A의 비밀 답변");
+    // 소개글은 기존 정책대로 열리지만, 질문·답변은 더 이상 이 경로로 내려가지 않는다(항목은 열람 결제로만 열린다).
+    const aSees = await call<{ peer: { bio: string | null; answers: unknown } }>("dd_view_pair", t.a.id, pairId);
+    const bSees = await call<{ peer: { bio: string | null; answers: unknown } }>("dd_view_pair", t.b.id, pairId);
+    expect(aSees.peer.answers).toBeNull();
+    expect(bSees.peer.answers).toBeNull();
+    expect(aSees.peer.bio).toBe("");
+    expect(bSees.peer.bio).toBe("");
+    expect(JSON.stringify([aSees, bSees])).not.toMatch(/비밀 답변/);
 
     expect(await call("dd_consent", t.a.id, pairId)).toBe("reviewing");
     expect(await call("dd_consent", t.a.id, pairId)).toBe("reviewing"); // 재호출해도 시작되지 않음
@@ -281,14 +279,12 @@ describe("독대와 열람 권한", () => {
     expect((await errorOf(call("dd_request_pair", t.b.id, t.a.id))).message).toBe("PAIR_EXISTS");
   });
 
-  it("준비를 마치지 않았거나 다른 방 참가자와는 독대할 수 없다", async () => {
+  it("질문 준비 여부와 무관하게 요청할 수 있지만, 다른 방 참가자·본인과는 독대할 수 없다", async () => {
     const r = await createRoom("에이");
     const b = await join(r.code, "비");
-    await makeReady(r.owner);
-    expect((await errorOf(call("dd_request_pair", r.owner.id, b.id))).message).toBe("PEER_NOT_READY");
-    expect((await errorOf(call("dd_request_pair", b.id, r.owner.id))).message).toBe("NOT_READY");
+    const pairId = await call<string>("dd_request_pair", r.owner.id, b.id); // 준비 조건 없음
+    expect(pairId).toBeTruthy();
     const other = await createRoom("타방");
-    await makeReady(other.owner);
     expect((await errorOf(call("dd_request_pair", r.owner.id, other.owner.id))).message).toBe("NOT_FOUND");
     expect((await errorOf(call("dd_request_pair", r.owner.id, r.owner.id))).message).toBe("NOT_FOUND");
   });

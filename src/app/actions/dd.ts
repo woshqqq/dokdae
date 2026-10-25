@@ -9,10 +9,13 @@ import { generateInviteCode, newParticipantToken, normalizeInviteCode } from "@/
 import {
   answerSchema,
   createRoomSchema,
+  costSchema,
   idSchema,
+  itemInputSchema,
   joinRoomSchema,
   profileSchema,
   questionBodySchema,
+  rewardAmountSchema,
 } from "@/lib/dd/validation";
 import { createFailureLimiter } from "@/lib/test-mode/rate-limit";
 
@@ -155,5 +158,68 @@ export async function endPairAction(roomId: string, pairId: string) {
     const viewer = await requireViewer(roomId);
     const status = await viewerRpc<string>(viewer, "dd_api_end_pair", { p_pair: parse(idSchema, pairId) });
     return { status };
+  });
+}
+
+export async function addItemAction(roomId: string, input: unknown) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    const item = parse(itemInputSchema, input);
+    await viewerRpc(viewer, "dd_api_add_item", { p_kind: item.kind, p_body: item.body, p_cost: item.cost });
+    return null;
+  });
+}
+
+export async function updateItemAction(roomId: string, itemId: string, input: unknown) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    const item = parse(itemInputSchema, input);
+    await viewerRpc(viewer, "dd_api_update_item", {
+      p_item: parse(idSchema, itemId),
+      p_kind: item.kind,
+      p_body: item.body,
+      p_cost: item.cost,
+    });
+    return null;
+  });
+}
+
+export async function deleteItemAction(roomId: string, itemId: string) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    await viewerRpc(viewer, "dd_api_delete_item", { p_item: parse(idSchema, itemId) });
+    return null;
+  });
+}
+
+/** 항목 열람(결제). 화면에서 본 비용(expectedCost)이 현재 비용과 다르면 서버가 거절한다. */
+export async function unlockItemAction(roomId: string, pairId: string, itemId: string, expectedCost: number) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    return viewerRpc<{ already_unlocked: boolean; unlock_id: string; balance: number }>(viewer, "dd_api_unlock_item", {
+      p_pair: parse(idSchema, pairId),
+      p_item: parse(idSchema, itemId),
+      p_expected_cost: parse(costSchema, expectedCost),
+    });
+  });
+}
+
+/** 보상 수량 선택(저장만 한다. 실제 이전은 confirmRewardAction). */
+export async function setRewardAction(roomId: string, unlockId: string, amount: number) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    await viewerRpc(viewer, "dd_api_set_reward", { p_unlock: parse(idSchema, unlockId), p_amount: parse(rewardAmountSchema, amount) });
+    return null;
+  });
+}
+
+/** 보상 지급 확정(열람 건당 한 번). 독대가 끝난 뒤에도 가능하다. */
+export async function confirmRewardAction(roomId: string, unlockId: string, expectedAmount: number) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    return viewerRpc<{ duplicate: boolean; reward_amount: number; balance: number }>(viewer, "dd_api_confirm_reward", {
+      p_unlock: parse(idSchema, unlockId),
+      p_expected_amount: parse(rewardAmountSchema, expectedAmount),
+    });
   });
 }
