@@ -96,7 +96,8 @@ describe("마이그레이션 일관성", () => {
     );
     const fns = await db.admin(
       `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname in ('public', 'private') and has_function_privilege('anon', p.oid, 'EXECUTE')`,
+       where n.nspname in ('public', 'private') and has_function_privilege('anon', p.oid, 'EXECUTE')
+         and left(p.proname, 7) <> 'dd_api_'`, // 독대 라이트 공개 API(토큰 검증)만 예외 — dokdae-lite-api.test.ts 에서 별도 검증
     );
     expect(tables).toEqual([]);
     expect(fns).toEqual([]);
