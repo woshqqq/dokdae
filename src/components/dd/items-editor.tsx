@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import type { ItemKind, MyItems, OwnerOpen } from "@/lib/dd/queries";
+import type { DefaultQuestion, ItemKind, MyItems, OwnerOpen } from "@/lib/dd/queries";
 import { formatTime } from "@/lib/format";
 
 export const KIND_LABEL: Record<ItemKind, string> = { tell: "알려주고 싶은 것", ask: "묻고 싶은 것" };
@@ -148,11 +148,23 @@ function ItemCard({ roomId, item, limits }: { roomId: string; item: MyItems["ite
   );
 }
 
-export function ItemsEditor({ roomId, data, balance }: { roomId: string; data: MyItems; balance: number }) {
+export function ItemsEditor({
+  roomId,
+  data,
+  balance,
+  questions = [],
+}: {
+  roomId: string;
+  data: MyItems;
+  balance: number;
+  questions?: DefaultQuestion[];
+}) {
   const router = useRouter();
   const [kind, setKind] = useState<ItemKind>("tell");
   const [body, setBody] = useState("");
   const [cost, setCost] = useState(data.cost_min);
+  // 고른 기본 질문은 작성 안내로만 쓴다. 항목 본문에는 자동으로 넣지 않고 저장하지도 않는다.
+  const [prompt, setPrompt] = useState<DefaultQuestion | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
   const [pending, start] = useTransition();
   const full = data.items.length >= data.max_items;
@@ -195,15 +207,46 @@ export function ItemsEditor({ roomId, data, balance }: { roomId: string; data: M
               const result = await addItemAction(roomId, { kind, body, cost });
               if (!result.ok) return setMsg({ tone: "error", text: result.error });
               setBody("");
+              setPrompt(null);
               setMsg({ tone: "success", text: "항목을 추가했어요." });
               router.refresh();
             });
           }}
         >
           <p className="font-semibold">새 항목 추가</p>
+          {questions.length > 0 ? (
+            <div className="space-y-2 rounded-xl bg-sunken p-3">
+              <p className="text-sm font-semibold">이런 질문으로 시작해 보세요</p>
+              <ul className="flex flex-col gap-2">
+                {questions.map((q) => (
+                  <li key={q.id}>
+                    <button
+                      type="button"
+                      aria-pressed={prompt?.id === q.id}
+                      onClick={() => setPrompt(prompt?.id === q.id ? null : q)}
+                      className={`min-h-11 w-full rounded-xl border px-3 py-2 text-left text-sm ${
+                        prompt?.id === q.id ? "border-brand bg-brand-soft font-semibold text-brand" : "border-line bg-surface"
+                      }`}
+                    >
+                      <span className="block text-xs font-bold text-brand">{q.title}</span>
+                      {q.body}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <Field label="유형" htmlFor="new-kind">
             <KindSelect id="new-kind" value={kind} onChange={setKind} />
           </Field>
+          {prompt ? (
+            <div role="note" className="rounded-xl border border-brand/30 bg-brand-soft px-3 py-2 text-sm leading-relaxed">
+              <p className="font-semibold text-brand">{prompt.title}</p>
+              <p>{prompt.body}</p>
+              {prompt.hint ? <p className="mt-1 text-xs text-muted">{prompt.hint}</p> : null}
+              <p className="mt-1 text-xs text-muted">안내 문구일 뿐이에요. 항목에는 아래에 직접 적은 내용만 저장됩니다.</p>
+            </div>
+          ) : null}
           <Field label="내용" htmlFor="new-body" hint={kind === "tell" ? "상대에게 들려주고 싶은 이야기를 적어요." : "상대에게 묻고 싶은 것을 적어요."}>
             <Textarea id="new-body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={500} />
           </Field>

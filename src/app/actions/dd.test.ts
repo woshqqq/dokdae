@@ -177,6 +177,32 @@ describe("방 생성·입장과 참가자 토큰 쿠키", () => {
   });
 });
 
+describe("기본 질문 안내(항목 작성 화면)", () => {
+  it("기본 질문 5개를 순서대로 읽고, 관리자 편집 내용이 그대로 반영된다(원격 DB 변경 없이 기존 RPC 사용)", async () => {
+    const list = await queries.getDefaultQuestions();
+    expect(list.map((q) => q.title)).toEqual(["지금의 나", "알아줬으면 하는 나", "잘 드러나지 않는 나", "나를 둘러싼 환경", "이해받고 싶은 나"]);
+    expect(Object.keys(list[0]).sort()).toEqual(["body", "hint", "id", "position", "title"]);
+
+    await db.admin(`update dd_questions set title = '바뀐 제목', body = '바뀐 질문', position = 99 where id = $1`, [list[0].id]);
+    const edited = await queries.getDefaultQuestions();
+    expect(edited[edited.length - 1]).toMatchObject({ id: list[0].id, title: "바뀐 제목", body: "바뀐 질문" });
+    await db.admin(`update dd_questions set title = $2, body = $3, position = $4 where id = $1`, [list[0].id, list[0].title, list[0].body, list[0].position]);
+  });
+
+  it("질문을 고르는 것만으로는 항목이 생기지 않고, 저장되는 항목 본문에 질문 문구가 섞이지 않는다", async () => {
+    as("A");
+    const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
+    const viewer = (await getViewer(roomId))!;
+    const [first] = await queries.getDefaultQuestions();
+    expect((await queries.getMyItems(viewer)).items).toEqual([]); // 안내만 보고 있을 때는 항목 0개
+    await ok(actions.addItemAction(roomId, { kind: "tell", body: "내가 직접 쓴 내용", cost: 1 }));
+    const saved = (await queries.getMyItems(viewer)).items;
+    expect(saved).toHaveLength(1);
+    expect(saved[0].body).toBe("내가 직접 쓴 내용");
+    expect(JSON.stringify(saved)).not.toContain(first.body);
+  });
+});
+
 describe("항목 구성", () => {
   it("항목 입력 검증: 빈 내용·잘못된 유형·범위 밖 비용·잘못된 ID", async () => {
     as("A");

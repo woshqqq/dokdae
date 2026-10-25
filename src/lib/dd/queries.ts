@@ -1,5 +1,5 @@
 import "server-only";
-import { viewerRpc } from "./db";
+import { ddRpc, viewerRpc } from "./db";
 import type { Viewer } from "./session";
 
 export type PairStatus = "requested" | "reviewing" | "active" | "closed" | "declined";
@@ -124,3 +124,14 @@ export interface Transaction {
 export const getMyItems = (viewer: Viewer) => viewerRpc<MyItems>(viewer, "dd_api_my_items");
 export const getPeerItems = (viewer: Viewer, pairId: string) => viewerRpc<PeerItems>(viewer, "dd_api_peer_items", { p_pair: pairId });
 export const getMyTransactions = (viewer: Viewer) => viewerRpc<Transaction[]>(viewer, "dd_api_my_transactions");
+
+export interface DefaultQuestion {
+  id: string;
+  title: string;
+  body: string;
+  hint: string;
+  position: number;
+}
+
+/** 관리자가 편집하는 기본 질문. 항목 작성 화면의 "이런 질문으로 시작해 보세요"에만 쓰고 항목 본문에는 저장하지 않는다. */
+export const getDefaultQuestions = () => ddRpc<DefaultQuestion[]>("dd_api_default_questions");
