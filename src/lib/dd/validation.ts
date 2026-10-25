@@ -31,4 +31,7 @@ export const itemBodySchema = text("항목 내용", 1, 500);
 // 허용 범위(1~3, 보상 0~5)는 DB의 dd_settings 가 최종 판단한다. 여기서는 형식만 거른다.
 export const costSchema = z.number().int("비용은 정수여야 해요.").min(1).max(100);
 export const rewardAmountSchema = z.number().int("보상은 정수여야 해요.").min(0).max(100);
-export const itemInputSchema = z.object({ kind: itemKindSchema, body: itemBodySchema, cost: costSchema });
+export const itemTitleSchema = text("항목 제목", 1, 60);
+export const itemInputSchema = z.object({ kind: itemKindSchema, title: itemTitleSchema, body: itemBodySchema, cost: costSchema });
+/** 기본 항목(기본 질문 슬롯): 제목·질문 문구는 관리자가 정하고, 참가자는 내용과 비용만 쓴다. 유형은 항상 tell. */
+export const defaultItemInputSchema = z.object({ body: itemBodySchema, cost: costSchema });

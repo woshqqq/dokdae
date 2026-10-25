@@ -3,7 +3,7 @@ import { ItemsEditor } from "@/components/dd/items-editor";
 import { NoAccess } from "@/components/dd/no-access";
 import { PageHeader, PageSkeleton } from "@/components/page";
 import { Card, EmptyState, Section } from "@/components/ui/card";
-import { getDefaultQuestions, getMyItems, getMyTransactions, getOverview, type Transaction } from "@/lib/dd/queries";
+import { getMyItems, getMyTransactions, getOverview, type Transaction } from "@/lib/dd/queries";
 import { getViewer } from "@/lib/dd/session";
 import { formatTime } from "@/lib/format";
 
@@ -21,17 +21,12 @@ async function Items({ params }: Pick<PageProps<"/room/[roomId]/items">, "params
   const { roomId } = await params;
   const viewer = await getViewer(roomId);
   if (!viewer) return <NoAccess />;
-  const [data, overview, transactions, questions] = await Promise.all([
-    getMyItems(viewer),
-    getOverview(viewer),
-    getMyTransactions(viewer),
-    getDefaultQuestions(),
-  ]);
+  const [data, overview, transactions] = await Promise.all([getMyItems(viewer), getOverview(viewer), getMyTransactions(viewer)]);
 
   return (
     <div className="space-y-6">
       <PageHeader title="내 항목" back={{ href: `/room/${roomId}`, label: overview.room.name }} />
-      <ItemsEditor roomId={roomId} data={data} balance={overview.balance} questions={questions} />
+      <ItemsEditor roomId={roomId} data={data} balance={overview.balance} />
 
       <Section title="토큰 내역">
         {transactions.length === 0 ? (

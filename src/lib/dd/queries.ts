@@ -12,7 +12,9 @@ export interface Overview {
   min_questions: number;
   /** 내 토큰 잔액 */
   balance: number;
+  /** 기본 항목 슬롯을 포함한 사용량 */
   items_count: number;
+  items_max: number;
   members: {
     id: string;
     nickname: string;
@@ -85,12 +87,25 @@ export interface OwnerOpen {
   reward_amount: number | null;
 }
 
+export interface DefaultSlot {
+  question_id: string;
+  /** 관리자가 편집하는 기본 질문의 제목·질문 문구·설명 */
+  title: string;
+  prompt: string;
+  hint: string;
+  /** 참가자가 내용을 쓰면 값이 생긴다. 쓰기 전에도 슬롯 자체는 항상 있다. */
+  item: { id: string; body: string; cost: number; opens: OwnerOpen[] } | null;
+}
+
 export interface MyItems {
   max_items: number;
+  /** 직접 추가할 수 있는 항목 수(최대 항목 수 − 기본 항목 수) */
+  custom_limit: number;
   cost_min: number;
   cost_max: number;
   reward_max: number;
-  items: { id: string; kind: ItemKind; body: string; cost: number; opens: OwnerOpen[] }[];
+  defaults: DefaultSlot[];
+  items: { id: string; kind: ItemKind; title: string; body: string; cost: number; opens: OwnerOpen[] }[];
   removed_opens: OwnerOpen[];
 }
 
@@ -103,6 +118,9 @@ export interface PeerItems {
     unlock_id: string;
     /** 독대가 active 일 때만 값이 있다(열람 당시 내용) */
     kind: ItemKind | null;
+    title: string | null;
+    /** 기본 항목이면 기본 질문 문구 */
+    prompt: string | null;
     body: string | null;
     item_deleted: boolean;
     tokens_paid: number;

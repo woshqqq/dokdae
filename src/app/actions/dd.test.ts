@@ -106,7 +106,7 @@ async function setupRoom() {
 
   for (const [browser, secret] of [["A", "A의 비밀"], ["B", "B의 비밀"]] as const) {
     as(browser);
-    for (let i = 0; i < 3; i++) await ok(actions.addItemAction(roomId, { kind: i % 2 ? "ask" : "tell", body: `${secret} 항목 ${i}`, cost: i + 1 }));
+    for (let i = 0; i < 3; i++) await ok(actions.addItemAction(roomId, { kind: i % 2 ? "ask" : "tell", title: "제목", body: `${secret} 항목 ${i}`, cost: i + 1 }));
   }
   return { roomId, code, viewerA, viewerB };
 }
@@ -166,7 +166,7 @@ describe("방 생성·입장과 참가자 토큰 쿠키", () => {
       actions.updateProfileAction(roomId, { nickname: "해커", bio: "" }),
       actions.addQuestionAction(roomId, "질문"),
       actions.markReadyAction(roomId),
-      actions.addItemAction(roomId, { kind: "tell", body: "x", cost: 1 }),
+      actions.addItemAction(roomId, { kind: "tell", title: "제목", body: "x", cost: 1 }),
       actions.unlockItemAction(roomId, "00000000-0000-4000-8000-0000000000a1", "00000000-0000-4000-8000-0000000000a2", 1),
       actions.setRewardAction(roomId, "00000000-0000-4000-8000-0000000000a1", 1),
       actions.confirmRewardAction(roomId, "00000000-0000-4000-8000-0000000000a1", 1),
@@ -177,29 +177,56 @@ describe("방 생성·입장과 참가자 토큰 쿠키", () => {
   });
 });
 
-describe("기본 질문 안내(항목 작성 화면)", () => {
-  it("기본 질문 5개를 순서대로 읽고, 관리자 편집 내용이 그대로 반영된다(원격 DB 변경 없이 기존 RPC 사용)", async () => {
-    const list = await queries.getDefaultQuestions();
-    expect(list.map((q) => q.title)).toEqual(["지금의 나", "알아줬으면 하는 나", "잘 드러나지 않는 나", "나를 둘러싼 환경", "이해받고 싶은 나"]);
-    expect(Object.keys(list[0]).sort()).toEqual(["body", "hint", "id", "position", "title"]);
-
-    await db.admin(`update dd_questions set title = '바뀐 제목', body = '바뀐 질문', position = 99 where id = $1`, [list[0].id]);
-    const edited = await queries.getDefaultQuestions();
-    expect(edited[edited.length - 1]).toMatchObject({ id: list[0].id, title: "바뀐 제목", body: "바뀐 질문" });
-    await db.admin(`update dd_questions set title = $2, body = $3, position = $4 where id = $1`, [list[0].id, list[0].title, list[0].body, list[0].position]);
-  });
-
-  it("질문을 고르는 것만으로는 항목이 생기지 않고, 저장되는 항목 본문에 질문 문구가 섞이지 않는다", async () => {
+describe("기본 항목(기본 질문 5개)", () => {
+  it("기본 질문 5개가 처음부터 작성할 항목 슬롯으로 있고, 내용을 쓰기 전에도 사라지지 않는다", async () => {
     as("A");
     const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
     const viewer = (await getViewer(roomId))!;
-    const [first] = await queries.getDefaultQuestions();
-    expect((await queries.getMyItems(viewer)).items).toEqual([]); // 안내만 보고 있을 때는 항목 0개
-    await ok(actions.addItemAction(roomId, { kind: "tell", body: "내가 직접 쓴 내용", cost: 1 }));
-    const saved = (await queries.getMyItems(viewer)).items;
-    expect(saved).toHaveLength(1);
-    expect(saved[0].body).toBe("내가 직접 쓴 내용");
-    expect(JSON.stringify(saved)).not.toContain(first.body);
+    const mine = await queries.getMyItems(viewer);
+    expect(mine.defaults.map((d) => d.title)).toEqual(["지금의 나", "알아줬으면 하는 나", "잘 드러나지 않는 나", "나를 둘러싼 환경", "이해받고 싶은 나"]);
+    expect(mine.defaults.every((d) => d.item === null && d.prompt.length > 0)).toBe(true);
+    expect(mine.items).toEqual([]);
+    expect((await getOverview(viewer)).items_count).toBe(5); // 기본 항목 5개는 한도(10)에 포함
+    expect((await getOverview(viewer)).items_max).toBe(10);
+    expect(mine.custom_limit).toBe(5);
+  });
+
+  it("기본 항목은 제목·질문 문구를 관리자 편집에서 가져오고, 내용은 사용자가 직접 쓴 것만 저장된다", async () => {
+    as("A");
+    const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
+    const viewer = (await getViewer(roomId))!;
+    const [first] = (await queries.getMyItems(viewer)).defaults;
+    await ok(actions.saveDefaultItemAction(roomId, first.question_id, { body: "내가 직접 쓴 내용", cost: 2 }));
+    const slot = (await queries.getMyItems(viewer)).defaults[0];
+    expect(slot.item).toMatchObject({ body: "내가 직접 쓴 내용", cost: 2 });
+    expect(slot.item!.body).not.toContain(first.prompt);
+
+    // 관리자 편집(dd_questions 수정)이 슬롯 제목·질문에 그대로 반영된다
+    await db.admin(`update dd_questions set title = '바뀐 제목', body = '바뀐 질문' where id = $1`, [first.question_id]);
+    const edited = (await queries.getMyItems(viewer)).defaults.find((d) => d.question_id === first.question_id)!;
+    expect(edited).toMatchObject({ title: "바뀐 제목", prompt: "바뀐 질문" });
+    expect(edited.item!.body).toBe("내가 직접 쓴 내용");
+    await db.admin(`update dd_questions set title = $2, body = $3 where id = $1`, [first.question_id, first.title, first.prompt]);
+
+    // 내용을 비워도 슬롯은 남는다
+    await ok(actions.deleteItemAction(roomId, slot.item!.id));
+    const cleared = (await queries.getMyItems(viewer)).defaults;
+    expect(cleared).toHaveLength(5);
+    expect(cleared[0].item).toBeNull();
+  });
+
+  it("기본 항목 입력 검증과 한도: 직접 추가는 5개까지", async () => {
+    as("A");
+    const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
+    const viewer = (await getViewer(roomId))!;
+    const [first] = (await queries.getMyItems(viewer)).defaults;
+    expect(await actions.saveDefaultItemAction(roomId, first.question_id, { body: "  ", cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await actions.saveDefaultItemAction(roomId, first.question_id, { body: "내용", cost: 4 })).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await actions.saveDefaultItemAction(roomId, "00000000-0000-4000-8000-0000000000ff", { body: "내용", cost: 1 })).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    for (let i = 0; i < 5; i++) await ok(actions.addItemAction(roomId, { kind: "ask", title: `제목 ${i}`, body: `내용 ${i}`, cost: 1 }));
+    expect(await actions.addItemAction(roomId, { kind: "ask", title: "여섯째", body: "내용", cost: 1 })).toMatchObject({ ok: false, code: "ITEM_LIMIT" });
+    await ok(actions.saveDefaultItemAction(roomId, first.question_id, { body: "기본 항목은 한도와 별개로 저장 가능", cost: 1 })); // 슬롯은 이미 한도에 포함
+    expect((await getOverview(viewer)).items_count).toBe(10);
   });
 });
 
@@ -207,23 +234,23 @@ describe("항목 구성", () => {
   it("항목 입력 검증: 빈 내용·잘못된 유형·범위 밖 비용·잘못된 ID", async () => {
     as("A");
     const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
-    expect(await actions.addItemAction(roomId, { kind: "tell", body: "   ", cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
-    expect(await actions.addItemAction(roomId, { kind: "bad", body: "내용", cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
-    expect(await actions.addItemAction(roomId, { kind: "tell", body: "내용", cost: 0 })).toMatchObject({ ok: false, code: "VALIDATION" });
-    expect(await actions.addItemAction(roomId, { kind: "tell", body: "내용", cost: 4 })).toMatchObject({ ok: false, code: "VALIDATION" }); // DB 설정 범위(1~3)
-    expect(await actions.addItemAction(roomId, { kind: "tell", body: "가".repeat(501), cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await actions.addItemAction(roomId, { kind: "tell", title: "제목", body: "   ", cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await actions.addItemAction(roomId, { kind: "bad", title: "제목", body: "내용", cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await actions.addItemAction(roomId, { kind: "tell", title: "제목", body: "내용", cost: 0 })).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await actions.addItemAction(roomId, { kind: "tell", title: "제목", body: "내용", cost: 4 })).toMatchObject({ ok: false, code: "VALIDATION" }); // DB 설정 범위(1~3)
+    expect(await actions.addItemAction(roomId, { kind: "tell", title: "제목", body: "가".repeat(501), cost: 1 })).toMatchObject({ ok: false, code: "VALIDATION" });
     expect(await actions.deleteItemAction(roomId, "x")).toMatchObject({ ok: false, code: "VALIDATION" });
     expect(await actions.setRewardAction(roomId, "x", 1)).toMatchObject({ ok: false, code: "VALIDATION" });
   });
 
-  it("항목은 최대 10개까지이고 초기 토큰 10개가 지급되어 있다", async () => {
+  it("직접 추가 항목은 최대 5개(기본 5개 포함 10개)까지이고 초기 토큰 10개가 지급되어 있다", async () => {
     as("A");
     const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
     const viewer = (await getViewer(roomId))!;
     expect((await getOverview(viewer)).balance).toBe(10);
-    for (let i = 0; i < 10; i++) await ok(actions.addItemAction(roomId, { kind: "tell", body: `항목 ${i}`, cost: 1 }));
-    expect(await actions.addItemAction(roomId, { kind: "tell", body: "11번째", cost: 1 })).toMatchObject({ ok: false, code: "ITEM_LIMIT" });
-    expect((await queries.getMyItems(viewer)).items).toHaveLength(10);
+    for (let i = 0; i < 5; i++) await ok(actions.addItemAction(roomId, { kind: "tell", title: "제목", body: `항목 ${i}`, cost: 1 }));
+    expect(await actions.addItemAction(roomId, { kind: "tell", title: "제목", body: "6번째", cost: 1 })).toMatchObject({ ok: false, code: "ITEM_LIMIT" });
+    expect((await queries.getMyItems(viewer)).items).toHaveLength(5);
   });
 
   it("질문 최소 개수 규칙이 없어 항목·질문 없이도 독대를 요청할 수 있다", async () => {
@@ -327,7 +354,7 @@ describe("독대·열람·보상 흐름(참가자 A·B)", () => {
     expect((await getOverview(t.viewerB)).balance).toBe(4);
     // B 가 A 에게 더 열 항목을 만들어 달라고 할 수는 없으므로, A 항목을 비용 3으로 더 추가해 잔액(4)을 소진시킨다
     as("A");
-    for (let i = 0; i < 3; i++) await ok(actions.addItemAction(t.roomId, { kind: "tell", body: `추가 ${i}`, cost: 3 }));
+    for (let i = 0; i < 2; i++) await ok(actions.addItemAction(t.roomId, { kind: "tell", title: "제목", body: `추가 ${i}`, cost: 3 }));
     as("B");
     const locked = (await queries.getPeerItems(t.viewerB, t.pairId)).items.filter((i) => !i.unlocked);
     await ok(actions.unlockItemAction(t.roomId, t.pairId, locked[0].id, 3));
@@ -361,7 +388,7 @@ describe("독대·열람·보상 흐름(참가자 A·B)", () => {
     const target = (await queries.getPeerItems(t.viewerB, t.pairId)).items[0];
     await ok(actions.unlockItemAction(t.roomId, t.pairId, target.id, target.cost));
     as("A");
-    expect(await actions.updateItemAction(t.roomId, target.id, { kind: "tell", body: "바꾸기", cost: target.cost })).toMatchObject({ ok: false, code: "ITEM_LOCKED" });
+    expect(await actions.updateItemAction(t.roomId, target.id, { kind: "tell", title: "제목", body: "바꾸기", cost: target.cost })).toMatchObject({ ok: false, code: "ITEM_LOCKED" });
     await ok(actions.deleteItemAction(t.roomId, target.id));
     const mine = await queries.getMyItems(t.viewerA);
     expect(mine.removed_opens).toHaveLength(1);
@@ -395,7 +422,7 @@ describe("독대·열람·보상 흐름(참가자 A·B)", () => {
     const { roomId, viewerB } = await setupRoom();
     const bItem = (await queries.getMyItems(viewerB)).items[0];
     as("A");
-    expect(await actions.updateItemAction(roomId, bItem.id, { kind: "tell", body: "변조", cost: 1 })).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    expect(await actions.updateItemAction(roomId, bItem.id, { kind: "tell", title: "제목", body: "변조", cost: 1 })).toMatchObject({ ok: false, code: "NOT_FOUND" });
     expect(await actions.deleteItemAction(roomId, bItem.id)).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 

@@ -58,7 +58,7 @@ async function ledgerMismatches() {
 }
 async function addItems(p: Who, n: number, label: string) {
   const ids: string[] = [];
-  for (let i = 0; i < n; i++) ids.push(await api<string>("dd_api_add_item", p.room, p.t, i % 2 ? "ask" : "tell", `${label} 항목 ${i}`, 1 + (i % 3)));
+  for (let i = 0; i < n; i++) ids.push(await api<string>("dd_api_add_item", p.room, p.t, i % 2 ? "ask" : "tell", `${label} 제목 ${i}`, `${label} 항목 ${i}`, 1 + (i % 3)));
   return ids;
 }
 async function activePair(a: Who, b: Who) {
@@ -111,20 +111,22 @@ describe("초기 지급: 기존·신규 참가자 모두 정확히 한 번", () 
 });
 
 describe("항목 등록", () => {
-  it("유형·내용·비용(1~3)을 검증하고 최대 10개까지만 등록할 수 있다", async () => {
+  it("유형·제목·내용·비용(1~3)을 검증하고, 기본 항목 5개를 포함해 최대 10개(직접 추가 5개)까지만 등록할 수 있다", async () => {
     const a = await newRoom();
-    for (const cost of [0, 4, null]) expect(await fails("dd_api_add_item", a.room, a.t, "tell", "내용", cost)).toBe("VALIDATION");
-    expect(await fails("dd_api_add_item", a.room, a.t, "bad", "내용", 1)).toBe("VALIDATION");
-    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "  ", 1)).toBe("VALIDATION");
-    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "가".repeat(501), 1)).toBe("VALIDATION");
-    await addItems(a, 10, "A");
-    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "11번째", 1)).toBe("ITEM_LIMIT");
+    for (const cost of [0, 4, null]) expect(await fails("dd_api_add_item", a.room, a.t, "tell", "제목", "내용", cost)).toBe("VALIDATION");
+    expect(await fails("dd_api_add_item", a.room, a.t, "bad", "제목", "내용", 1)).toBe("VALIDATION");
+    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "제목", "  ", 1)).toBe("VALIDATION");
+    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "제목", "가".repeat(501), 1)).toBe("VALIDATION");
+    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "  ", "내용", 1)).toBe("VALIDATION"); // 제목 필수
+    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "가".repeat(61), "내용", 1)).toBe("VALIDATION");
+    await addItems(a, 5, "A");
+    expect(await fails("dd_api_add_item", a.room, a.t, "tell", "제목", "6번째", 1)).toBe("ITEM_LIMIT");
   });
 
   it("남의 항목은 수정·삭제할 수 없고, 다른 방 토큰은 거절된다", async () => {
     const { a, b } = await trio();
     const [item] = await addItems(a, 1, "A");
-    expect(await fails("dd_api_update_item", b.room, b.t, item, "tell", "변조", 1)).toBe("NOT_FOUND");
+    expect(await fails("dd_api_update_item", b.room, b.t, item, "tell", "제목", "변조", 1)).toBe("NOT_FOUND");
     expect(await fails("dd_api_delete_item", b.room, b.t, item)).toBe("NOT_FOUND");
     const other = await newRoom("타방");
     expect(await fails("dd_api_my_items", a.room, other.t)).toBe("UNAUTHENTICATED");
@@ -234,7 +236,7 @@ describe("열람(결제)", () => {
 
   it("잔액이 부족하면 거절되고 잔액은 음수가 되지 않는다", async () => {
     const { a, b } = await trio();
-    for (let i = 0; i < 10; i++) await api("dd_api_add_item", a.room, a.t, "tell", `A ${i}`, 3);
+    for (let i = 0; i < 5; i++) await api("dd_api_add_item", a.room, a.t, "tell", "제목", `A ${i}`, 3);
     const pair = await activePair(a, b);
     const items = (await peer(b, pair)).items;
     for (let i = 0; i < 3; i++) await unlock(b, pair, items[i].id, 3); // 9개 사용, 1개 남음
@@ -274,10 +276,10 @@ describe("열람된 항목의 수정·삭제와 내용 보존(스냅샷)", () =>
 
   it("열람된 항목은 유형·본문을 바꿀 수 없고(비용만 변경 가능), 열람 전 항목은 수정할 수 있다", async () => {
     const { a, ids } = await openedScenario();
-    expect(await fails("dd_api_update_item", a.room, a.t, ids[0], "tell", "내용 바꾸기", 1)).toBe("ITEM_LOCKED");
-    expect(await fails("dd_api_update_item", a.room, a.t, ids[0], "ask", "A의 비밀 항목 0", 1)).toBe("ITEM_LOCKED");
-    await api("dd_api_update_item", a.room, a.t, ids[0], "tell", "A의 비밀 항목 0", 3); // 비용만
-    await api("dd_api_update_item", a.room, a.t, ids[2], "ask", "열람 전에는 수정 가능", 2);
+    expect(await fails("dd_api_update_item", a.room, a.t, ids[0], "tell", "A의 비밀 제목 0", "내용 바꾸기", 1)).toBe("ITEM_LOCKED");
+    expect(await fails("dd_api_update_item", a.room, a.t, ids[0], "ask", "A의 비밀 제목 0", "A의 비밀 항목 0", 1)).toBe("ITEM_LOCKED");
+    await api("dd_api_update_item", a.room, a.t, ids[0], "tell", "A의 비밀 제목 0", "A의 비밀 항목 0", 3); // 비용만
+    await api("dd_api_update_item", a.room, a.t, ids[2], "ask", "새 제목", "열람 전에는 수정 가능", 2);
   });
 
   it("항목을 삭제해도 열람자는 독대가 끝나기 전까지 열람 당시 내용을 보고, 열람·거래 기록은 남는다", async () => {
@@ -415,7 +417,7 @@ describe("보상: 선택과 확정의 분리", () => {
 
   it("보상 확정 시 잔액이 부족하면 거절되고 아무것도 바뀌지 않는다", async () => {
     const { a, b } = await trio();
-    for (let i = 0; i < 4; i++) await api("dd_api_add_item", a.room, a.t, "tell", `A ${i}`, 3);
+    for (let i = 0; i < 4; i++) await api("dd_api_add_item", a.room, a.t, "tell", "제목", `A ${i}`, 3);
     const pair = await activePair(a, b);
     const items = (await peer(b, pair)).items;
     const unlocks = [];
@@ -458,5 +460,87 @@ describe("원장 불변식과 권한", () => {
     expect((await errorOf(sql(`update dd_wallets set balance = -1 where participant_id = $1`, [a.id]))).message).toMatch(/check constraint/);
     expect((await errorOf(sql(`insert into dd_token_tx (room_id, recipient_id, amount, type) values ($1, $2, 0, 'initial_grant')`, [a.room, a.id]))).message).toMatch(/check constraint/);
     expect((await errorOf(sql(`insert into dd_token_tx (room_id, recipient_id, amount, type) values ($1, $2, 5, 'initial_grant')`, [a.room, a.id]))).message).toMatch(/duplicate key|unique/);
+  });
+});
+
+describe("기본 항목(기본 질문 슬롯)과 제목", () => {
+  const defaultQuestions = () => api<{ id: string; title: string; body: string }[]>("dd_api_default_questions");
+
+  it("슬롯은 항상 5개 보이고 내용을 쓴 것만 항목 행이 되며, 상대에게는 쓴 것만 개수로 잡힌다", async () => {
+    const { a, b } = await trio();
+    const qs = await defaultQuestions();
+    const mine = await api<{ defaults: { question_id: string; title: string; prompt: string; item: unknown }[]; custom_limit: number }>("dd_api_my_items", a.room, a.t);
+    expect(mine.defaults).toHaveLength(5);
+    expect(mine.defaults.every((d) => d.item === null)).toBe(true);
+    expect(mine.custom_limit).toBe(5);
+    await api("dd_api_save_default_item", a.room, a.t, qs[1].id, "두 번째 기본 항목 내용", 2);
+    await addItems(a, 1, "A");
+    const pair = await activePair(a, b);
+    const blind = await peer(b, pair);
+    expect(blind.items).toHaveLength(2); // 쓰지 않은 기본 항목은 상대에게 보이지 않는다
+    expect(JSON.stringify(blind)).not.toMatch(/두 번째 기본 항목|지금의 나|알아줬으면|"title"|"prompt"/);
+    const after = await api<{ defaults: { item: { body: string; cost: number } | null }[] }>("dd_api_my_items", a.room, a.t);
+    expect(after.defaults.filter((d) => d.item).length).toBe(1);
+    // 비우기: 슬롯은 남고 항목만 사라진다
+    const slot = after.defaults.find((d) => d.item) as unknown as { item: { id: string } };
+    await api("dd_api_delete_item", a.room, a.t, slot.item.id);
+    const cleared = await api<{ defaults: unknown[] }>("dd_api_my_items", a.room, a.t);
+    expect(cleared.defaults).toHaveLength(5);
+  });
+
+  it("기본 항목 검증: 범위 밖 비용·빈 내용·없는 질문·직접 추가 항목의 질문 ID 위조는 거절된다", async () => {
+    const { a, b } = await trio();
+    const qs = await defaultQuestions();
+    expect(await fails("dd_api_save_default_item", a.room, a.t, qs[0].id, "내용", 4)).toBe("VALIDATION");
+    expect(await fails("dd_api_save_default_item", a.room, a.t, qs[0].id, "  ", 1)).toBe("VALIDATION");
+    expect(await fails("dd_api_save_default_item", a.room, a.t, "00000000-0000-4000-8000-0000000000ff", "내용", 1)).toBe("NOT_FOUND");
+    expect(await fails("dd_api_save_default_item", a.room, "wrong", qs[0].id, "내용", 1)).toBe("UNAUTHENTICATED");
+    const personal = await addItems(b, 1, "B");
+    expect(await fails("dd_api_update_item", b.room, b.t, personal[0], "tell", "", "내용", 1)).toBe("VALIDATION"); // 직접 추가 항목은 제목 필수
+    // 기본 항목은 update_item 으로 바꿀 수 없다(save_default_item 전용)
+    const id = await api<string>("dd_api_save_default_item", a.room, a.t, qs[0].id, "내용", 1);
+    expect(await fails("dd_api_update_item", a.room, a.t, id, "tell", "제목", "변조", 1)).toBe("NOT_FOUND");
+  });
+
+  it("열람하면 제목·질문 문구·내용이 스냅샷으로 보이고, 이후 편집과 종료에 맞춰 보존·삭제된다", async () => {
+    const { a, b, c } = await trio();
+    const qs = await defaultQuestions();
+    const defId = await api<string>("dd_api_save_default_item", a.room, a.t, qs[0].id, "기본 항목 내용", 1);
+    const [custom] = await addItems(a, 1, "A의 비밀");
+    const pair = await activePair(a, b);
+    const blind = await peer(b, pair);
+    const costDef = blind.items.find((i) => i.id === defId)!.cost;
+    const r = await unlock(b, pair, defId, costDef);
+    expect(r).toMatchObject({ kind: "tell", title: qs[0].title, prompt: qs[0].body, body: "기본 항목 내용" });
+    const costCustom = blind.items.find((i) => i.id === custom)!.cost;
+    const rc = await unlock(b, pair, custom, costCustom);
+    expect(rc).toMatchObject({ title: "A의 비밀 제목 0", prompt: null, body: "A의 비밀 항목 0" });
+
+    // 열람 후에는 내용 수정 금지(비용만 가능), 비우기·삭제 후에도 열람자는 스냅샷을 본다
+    expect(await fails("dd_api_save_default_item", a.room, a.t, qs[0].id, "내용 바꾸기", 1)).toBe("ITEM_LOCKED");
+    await api("dd_api_save_default_item", a.room, a.t, qs[0].id, "기본 항목 내용", 3);
+    await sql(`update dd_questions set title = '관리자가 바꾼 제목' where id = $1`, [qs[0].id]);
+    await api("dd_api_delete_item", a.room, a.t, defId);
+    await api("dd_api_delete_item", a.room, a.t, custom);
+    const view = await peer(b, pair);
+    const opened = view.opened as { title: string; prompt: string | null; body: string; item_deleted: boolean }[];
+    expect(opened.map((o) => o.title).sort()).toEqual([qs[0].title, "A의 비밀 제목 0"].sort()); // 열람 당시 제목
+    expect(opened.every((o) => o.item_deleted)).toBe(true);
+    await sql(`update dd_questions set title = $2 where id = $1`, [qs[0].id, qs[0].title]);
+
+    // 제3자에게는 제목·질문·내용이 어느 경로로도 보이지 않는다
+    expect(await fails("dd_api_peer_items", c.room, c.t, pair)).toBe("NOT_FOUND");
+    expect(JSON.stringify(await api("dd_api_my_items", c.room, c.t))).not.toMatch(/기본 항목 내용|A의 비밀/);
+
+    // 종료하면 스냅샷의 제목·질문 문구·내용이 모두 DB에서 지워진다
+    await api("dd_api_end_pair", a.room, a.t, pair);
+    const closed = await sql<{ n: number }>(
+      `select count(*)::int n from dd_unlocks where pair_id = $1 and (snapshot_title is not null or snapshot_prompt is not null or snapshot_body is not null or snapshot_kind is not null)`,
+      [pair],
+    );
+    expect(closed[0].n).toBe(0);
+    const afterClose = await peer(b, pair);
+    expect(JSON.stringify(afterClose)).not.toMatch(/기본 항목 내용|A의 비밀|"title":"/);
+    expect(await ledgerMismatches()).toBe(0);
   });
 });

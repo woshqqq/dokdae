@@ -55,7 +55,7 @@ async function Room({ params, searchParams }: Pick<PageProps<"/room/[roomId]">, 
           <p className="text-2xl font-extrabold tabular-nums">{o.balance}개</p>
         </div>
         <LinkButton href={`/room/${roomId}/items`} variant="secondary" size="sm">
-          내 항목 {o.items_count}/10
+          내 항목 {o.items_count}/{o.items_max}
         </LinkButton>
       </Card>
 

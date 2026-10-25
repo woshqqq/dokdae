@@ -110,7 +110,11 @@ function OpenedCard({
         <p className="shrink-0 text-xs text-muted">{entry.tokens_paid}개 지불</p>
       </div>
       {entry.body !== null ? (
-        <p className="whitespace-pre-wrap leading-relaxed">{entry.body}</p>
+        <div className="space-y-1">
+          {entry.title ? <p className="font-semibold">{entry.title}</p> : null}
+          {entry.prompt ? <p className="text-sm text-muted">{entry.prompt}</p> : null}
+          <p className="whitespace-pre-wrap leading-relaxed">{entry.body}</p>
+        </div>
       ) : (
         <p className="text-sm text-muted">독대가 끝나 내용은 더 이상 보이지 않아요.</p>
       )}

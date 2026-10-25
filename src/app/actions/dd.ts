@@ -10,6 +10,7 @@ import {
   answerSchema,
   createRoomSchema,
   costSchema,
+  defaultItemInputSchema,
   idSchema,
   itemInputSchema,
   joinRoomSchema,
@@ -165,7 +166,7 @@ export async function addItemAction(roomId: string, input: unknown) {
   return ddAction(async () => {
     const viewer = await requireViewer(roomId);
     const item = parse(itemInputSchema, input);
-    await viewerRpc(viewer, "dd_api_add_item", { p_kind: item.kind, p_body: item.body, p_cost: item.cost });
+    await viewerRpc(viewer, "dd_api_add_item", { p_kind: item.kind, p_title: item.title, p_body: item.body, p_cost: item.cost });
     return null;
   });
 }
@@ -177,6 +178,21 @@ export async function updateItemAction(roomId: string, itemId: string, input: un
     await viewerRpc(viewer, "dd_api_update_item", {
       p_item: parse(idSchema, itemId),
       p_kind: item.kind,
+      p_title: item.title,
+      p_body: item.body,
+      p_cost: item.cost,
+    });
+    return null;
+  });
+}
+
+/** 기본 항목(기본 질문 슬롯)의 내용·비용 저장. 질문 문구는 저장하지 않고 항상 기본 질문에서 읽는다. */
+export async function saveDefaultItemAction(roomId: string, questionId: string, input: unknown) {
+  return ddAction(async () => {
+    const viewer = await requireViewer(roomId);
+    const item = parse(defaultItemInputSchema, input);
+    await viewerRpc(viewer, "dd_api_save_default_item", {
+      p_question: parse(idSchema, questionId),
       p_body: item.body,
       p_cost: item.cost,
     });
