@@ -183,7 +183,7 @@ describe("기본 항목(기본 질문 5개)", () => {
     const { roomId } = await ok(actions.createRoomAction({ name: "방", nickname: "에이" }));
     const viewer = (await getViewer(roomId))!;
     const mine = await queries.getMyItems(viewer);
-    expect(mine.defaults.map((d) => d.title)).toEqual(["지금의 나", "알아줬으면 하는 나", "잘 드러나지 않는 나", "나를 둘러싼 환경", "이해받고 싶은 나"]);
+    expect(mine.defaults.map((d) => d.title)).toEqual(["최근 내 삶의 키워드", "리즈시절", "삶의 철학", "힘든 환경", "특이사항"]);
     expect(mine.defaults.every((d) => d.item === null && d.prompt.length > 0)).toBe(true);
     expect(mine.items).toEqual([]);
     expect((await getOverview(viewer)).items_count).toBe(5); // 기본 항목 5개는 한도(10)에 포함

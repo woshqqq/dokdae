@@ -14,7 +14,16 @@
       "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx supabase init 2>&1 | Select-Object -Last 5; Get-ChildItem supabase -Force -Recurse | Select-Object FullName)",
       "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx vitest run supabase 2>&1 | Select-Object -Last 80)",
       "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npx vitest run supabase 2>&1 | Select-Object -Last 30)",
-      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npm test 2>&1 | Select-Object -Last 25; npm run typecheck 2>&1 | Select-Object -Last 30; npm run lint 2>&1 | Select-Object -Last 30)"
+      "PowerShell($env:Path = [Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path','User'\\); cd \"C:\\\\git\\\\새 폴더\\\\dokdae\"; npm test 2>&1 | Select-Object -Last 25; npm run typecheck 2>&1 | Select-Object -Last 30; npm run lint 2>&1 | Select-Object -Last 30)",
+      "Bash(git diff *)",
+      "Bash(grep -vE '^\\\\-\\\\s*\\(\"libc\": \\\\[|\"glibc\"|\"musl\"|\\\\],?\\)$')",
+      "Bash(npx tsc *)",
+      "Bash(git add *)",
+      "Bash(tee /tmp/staged.txt)",
+      "Bash(grep -E \"\\(^|/\\)\\\\.env\\($|\\\\.local\\)|\\\\.vercel|supabase/\\\\.temp|node_modules|\\\\.next/\" /tmp/staged.txt)",
+      "Bash(gh auth *)",
+      "Bash(node \"C:/Users/KSJ/AppData/Local/Temp/claude/c--git-dokdae/731a1518-516d-4a47-9c21-70df6fb4f932/scratchpad/run-draft.mjs\")",
+      "Bash(node run-draft.mjs)"
     ]
   }
 }
