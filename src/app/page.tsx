@@ -49,9 +49,9 @@ async function Home() {
     <div className="space-y-8">
       <div className="space-y-3 pt-2">
         <h1 className="text-3xl font-extrabold leading-snug">
-          마주 앉아,
+          NT모임,
           <br />
-          한 사람에게 집중하는 시간
+          독대의 공간
         </h1>
         <p className="leading-relaxed text-muted">
           가입 없이 방을 만들거나 초대 코드로 입장하세요. 서로 동의한 상대에게만 내 이야기가 열립니다.
